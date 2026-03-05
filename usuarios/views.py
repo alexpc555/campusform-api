@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from .authentication import CustomJWTAuthentication
 from rest_framework.exceptions import PermissionDenied, NotFound
 from django.db.models import Count
 from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer
@@ -76,7 +76,7 @@ class LoginView(APIView):
 
 class CategoriaListCreateView(generics.ListCreateAPIView):
     serializer_class = CategoriaSerializer
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAdminOrProfesorForWrite]  # Lectura pública, escritura restringida
     
     def get_queryset(self):
@@ -96,8 +96,8 @@ class CategoriaDetailView(generics.RetrieveUpdateDestroyAPIView):
     - PUT/PATCH/DELETE: Solo admin puede modificar/eliminar
     """
     serializer_class = CategoriaSerializer
-    authentication_classes = [JWTAuthentication]
-    permission_classes = [IsAdminOrReadOnly]
+    authentication_classes = [CustomJWTAuthentication]
+    permission_classes = [IsAdminOrProfesorForWrite]
     
     def get_queryset(self):
         """

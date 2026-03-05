@@ -13,6 +13,10 @@ class Alumno(models.Model):
     
     def check_password(self, raw_password):
         return check_password(raw_password, self.contrasena)
+    
+    @property
+    def is_authenticated(self):
+     return True
 
 class Profesor(models.Model):
     nombre = models.CharField(max_length=100)
@@ -26,6 +30,10 @@ class Profesor(models.Model):
     
     def check_password(self, raw_password):
         return check_password(raw_password, self.contrasena)
+    
+    @property
+    def is_authenticated(self):
+     return True
 
 class Admin(models.Model):
     nombre = models.CharField(max_length=100)
@@ -39,6 +47,10 @@ class Admin(models.Model):
     
     def check_password(self, raw_password):
         return check_password(raw_password, self.contrasena)
+    
+    @property
+    def is_authenticated(self):
+     return True
 
 class Categoria(models.Model):
     nombre = models.CharField(max_length=100)
