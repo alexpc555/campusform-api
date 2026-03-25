@@ -16,7 +16,11 @@ SECRET_KEY = 'django-insecure-depm*+r$3k$7=@34_ffd9dgs!zi0t#u$(!#9)&j@g1_bstd5dd
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    'campusform-api.onrender.com',
+    'localhost',
+    '127.0.0.1'
+]
 
 # Application definition
 INSTALLED_APPS = [
@@ -140,3 +144,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+CORS_ALLOWED_ORIGINS = [
+    "https://TU-FRONTEND.vercel.app",
+    "http://localhost:4200",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://TU-FRONTEND.vercel.app",
+    "http://localhost:4200",
+]
