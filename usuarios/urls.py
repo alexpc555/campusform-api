@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     RegisterView, LoginView, CategoriaListCreateView, CategoriaDetailView,
-    UsuarioListCreateView, UsuarioDetailView
+    UsuarioListCreateView, UsuarioDetailView, PostListCreateView, 
+    MisPostsView, PostDetailView
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -14,7 +15,12 @@ urlpatterns = [
     path('categorias/', CategoriaListCreateView.as_view(), name='categoria-list'),
     path('categorias/<int:pk>/', CategoriaDetailView.as_view(), name='categoria-detail'),
     
-    # Usuarios (solo admin)
+    # Usuarios
     path('usuarios/', UsuarioListCreateView.as_view(), name='usuario-list'),
     path('usuarios/<int:pk>/', UsuarioDetailView.as_view(), name='usuario-detail'),
+    
+    # Posts
+    path('posts/', PostListCreateView.as_view(), name='post-list'),
+    path('posts/mis-posts/', MisPostsView.as_view(), name='mis-posts'),
+    path('posts/<int:pk>/', PostDetailView.as_view(), name='post-detail'),
 ]

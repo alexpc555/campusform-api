@@ -6,10 +6,21 @@ from .authentication import CustomJWTAuthentication
 from rest_framework.exceptions import PermissionDenied, NotFound
 from django.db.models import Count
 from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer
-from .models import Alumno, Profesor, Admin, Categoria
+from .models import Alumno, Profesor, Admin, Categoria,Post
 from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite  # Agregué IsAdminOrProfesorForWrite
 from rest_framework import generics
 from .permissions import IsAdmin
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, generics, permissions
+from rest_framework_simplejwt.tokens import RefreshToken
+from .authentication import CustomJWTAuthentication
+from rest_framework.exceptions import PermissionDenied, NotFound
+from django.db.models import Count, Q
+from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer, PostSerializer
+from .models import Alumno, Profesor, Admin, Categoria, Post
+from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite
 
 class RegisterView(APIView):
     def post(self, request):
@@ -306,3 +317,104 @@ class UsuarioDetailView(APIView):
         user, role = self.get_user_and_role(pk)
         user.delete()
         return Response({'message': 'Usuario eliminado correctamente'}, status=status.HTTP_200_OK)
+
+        #codigo nuevo 25/03/2026 -----------------------------------------------------------------------
+    
+class PostListCreateView(generics.ListCreateAPIView):
+    """Vista para listar y crear publicaciones"""
+    serializer_class = PostSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        queryset = Post.objects.all()
+        
+        # Filtrar por categoría si se especifica
+        categoria_id = self.request.query_params.get('categoria')
+        if categoria_id:
+            queryset = queryset.filter(categoria_id=categoria_id)
+        
+        return queryset.order_by('-fecha_creacion')
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        
+        # Buscar el usuario en los diferentes modelos
+        try:
+            alumno = Alumno.objects.get(id=user.id)
+            serializer.save(autor_alumno=alumno)
+        except Alumno.DoesNotExist:
+            try:
+                profesor = Profesor.objects.get(id=user.id)
+                serializer.save(autor_profesor=profesor)
+            except Profesor.DoesNotExist:
+                try:
+                    admin = Admin.objects.get(id=user.id)
+                    serializer.save(autor_admin=admin)
+                except Admin.DoesNotExist:
+                    raise PermissionDenied("Usuario no válido")
+
+class MisPostsView(generics.ListAPIView):
+    """Vista para obtener los posts del usuario autenticado"""
+    serializer_class = PostSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        try:
+            alumno = Alumno.objects.get(id=user.id)
+            return Post.objects.filter(autor_alumno=alumno).order_by('-fecha_creacion')
+        except Alumno.DoesNotExist:
+            try:
+                profesor = Profesor.objects.get(id=user.id)
+                return Post.objects.filter(autor_profesor=profesor).order_by('-fecha_creacion')
+            except Profesor.DoesNotExist:
+                try:
+                    admin = Admin.objects.get(id=user.id)
+                    return Post.objects.filter(autor_admin=admin).order_by('-fecha_creacion')
+                except Admin.DoesNotExist:
+                    return Post.objects.none()
+
+class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Vista para ver, actualizar y eliminar una publicación específica"""
+    serializer_class = PostSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        return Post.objects.all()
+    
+    def get_object(self):
+        obj = super().get_object()
+        
+        # Incrementar vistas solo para GET requests
+        if self.request.method == 'GET':
+            obj.vistas += 1
+            obj.save()
+        
+        return obj
+    
+    def perform_update(self, serializer):
+        user = self.request.user
+        post = self.get_object()
+        
+        # Verificar que el usuario sea el autor
+        autor = post.autor
+        if autor and autor.id == user.id:
+            serializer.save()
+        else:
+            raise PermissionDenied("Solo el autor puede editar esta publicación")
+    
+    def perform_destroy(self, instance):
+        user = self.request.user
+        autor = instance.autor
+        
+        # Verificar que el usuario sea el autor o admin
+        if autor and autor.id == user.id:
+            instance.delete()
+        else:
+            # Verificar si es admin
+            try:
+                Admin.objects.get(id=user.id)
+                instance.delete()
+            except Admin.DoesNotExist:
+                raise PermissionDenied("No tienes permiso para eliminar esta publicación")

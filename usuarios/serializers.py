@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Alumno, Profesor, Admin, Categoria
+from .models import Alumno, Profesor, Admin, Categoria,Post
 
 class RegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
@@ -81,3 +81,26 @@ class CategoriaSerializer(serializers.ModelSerializer):
             'fecha_creacion', 'fecha_actualizacion'
         ]
         read_only_fields = ['id', 'creada_por', 'fecha_creacion', 'fecha_actualizacion']
+
+
+#serializer nuevos 25/03/2026
+class PostSerializer(serializers.ModelSerializer):
+    categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
+    autor_nombre = serializers.CharField(read_only=True)
+    autor_tipo = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'titulo', 'contenido', 'categoria', 'categoria_nombre',
+            'autor_nombre', 'autor_tipo', 'etiquetas', 'vistas',
+            'fecha_creacion', 'fecha_actualizacion'
+        ]
+        read_only_fields = ['id', 'fecha_creacion', 'fecha_actualizacion', 'vistas']
+    
+    def validate(self, data):
+        request = self.context.get('request')
+        if request and request.user:
+            # Verificar que el usuario esté autenticado
+            return data
+        raise serializers.ValidationError("Usuario no autenticado")
