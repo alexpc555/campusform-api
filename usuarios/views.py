@@ -8,6 +8,8 @@ from django.db.models import Count
 from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer
 from .models import Alumno, Profesor, Admin, Categoria
 from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite  # Agregué IsAdminOrProfesorForWrite
+from rest_framework import generics
+from .permissions import IsAdmin
 
 class RegisterView(APIView):
     def post(self, request):
@@ -135,3 +137,172 @@ class CategoriaDetailView(generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("Solo administradores pueden eliminar categorías")
         
         instance.delete()
+
+#codigo nuevo 25/03/2026
+
+class UsuarioListCreateView(APIView):
+    """Vista para listar y crear usuarios (solo admin)"""
+    authentication_classes = [CustomJWTAuthentication]
+    permission_classes = [IsAdmin]
+    
+    def get(self, request):
+        """Obtener todos los usuarios"""
+        # Obtener todos los usuarios de los tres modelos
+        alumnos = Alumno.objects.all().values('id', 'nombre', 'correo')
+        profesores = Profesor.objects.all().values('id', 'nombre', 'correo')
+        admins = Admin.objects.all().values('id', 'nombre', 'correo')
+        
+        # Combinar y agregar rol
+        usuarios = []
+        
+        for a in alumnos:
+            usuarios.append({
+                'id': a['id'],
+                'nombre': a['nombre'],
+                'correo': a['correo'],
+                'rol': 'student'
+            })
+        
+        for p in profesores:
+            usuarios.append({
+                'id': p['id'],
+                'nombre': p['nombre'],
+                'correo': p['correo'],
+                'rol': 'teacher'
+            })
+        
+        for a in admins:
+            usuarios.append({
+                'id': a['id'],
+                'nombre': a['nombre'],
+                'correo': a['correo'],
+                'rol': 'admin'
+            })
+        
+        return Response(usuarios)
+    
+    def post(self, request):
+        """Crear un nuevo usuario"""
+        nombre = request.data.get('nombre')
+        correo = request.data.get('correo')
+        contrasena = request.data.get('contrasena')
+        rol = request.data.get('rol')
+        
+        # Validaciones
+        if not nombre or not correo or not contrasena or not rol:
+            return Response({'message': 'Todos los campos son requeridos'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar que no exista el correo
+        if (Alumno.objects.filter(correo=correo).exists() or 
+            Profesor.objects.filter(correo=correo).exists() or
+            Admin.objects.filter(correo=correo).exists()):
+            return Response({'message': 'El correo ya está registrado'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Crear según rol
+        try:
+            if rol == 'student':
+                user = Alumno.objects.create(
+                    nombre=nombre, 
+                    correo=correo, 
+                    contrasena=contrasena
+                )
+            elif rol == 'teacher':
+                user = Profesor.objects.create(
+                    nombre=nombre, 
+                    correo=correo, 
+                    contrasena=contrasena
+                )
+            elif rol == 'admin':
+                user = Admin.objects.create(
+                    nombre=nombre, 
+                    correo=correo, 
+                    contrasena=contrasena
+                )
+            else:
+                return Response({'message': 'Rol no válido'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                'id': user.id,
+                'nombre': user.nombre,
+                'correo': user.correo,
+                'rol': rol
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            return Response({'message': f'Error al crear usuario: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+class UsuarioDetailView(APIView):
+    """Vista para obtener, actualizar y eliminar un usuario específico (solo admin)"""
+    authentication_classes = [CustomJWTAuthentication]
+    permission_classes = [IsAdmin]
+    
+    def get_user_and_role(self, pk):
+        """Helper para obtener usuario y su rol"""
+        try:
+            user = Alumno.objects.get(id=pk)
+            return user, 'student'
+        except Alumno.DoesNotExist:
+            try:
+                user = Profesor.objects.get(id=pk)
+                return user, 'teacher'
+            except Profesor.DoesNotExist:
+                try:
+                    user = Admin.objects.get(id=pk)
+                    return user, 'admin'
+                except Admin.DoesNotExist:
+                    raise NotFound('Usuario no encontrado')
+    
+    def get(self, request, pk):
+        """Obtener un usuario específico"""
+        user, role = self.get_user_and_role(pk)
+        
+        return Response({
+            'id': user.id,
+            'nombre': user.nombre,
+            'correo': user.correo,
+            'rol': role
+        })
+    
+    def put(self, request, pk):
+        """Actualizar un usuario"""
+        user, role = self.get_user_and_role(pk)
+        
+        # Actualizar campos
+        if 'nombre' in request.data:
+            user.nombre = request.data['nombre']
+        
+        if 'correo' in request.data:
+            new_email = request.data['correo']
+            if new_email != user.correo:
+                # Verificar que el nuevo correo no exista en otros usuarios
+                email_exists = False
+                
+                if role != 'student' and Alumno.objects.filter(correo=new_email).exists():
+                    email_exists = True
+                elif role != 'teacher' and Profesor.objects.filter(correo=new_email).exists():
+                    email_exists = True
+                elif role != 'admin' and Admin.objects.filter(correo=new_email).exists():
+                    email_exists = True
+                
+                if email_exists:
+                    return Response({'message': 'El correo ya está en uso'}, status=status.HTTP_400_BAD_REQUEST)
+                
+                user.correo = new_email
+        
+        if 'contrasena' in request.data and request.data['contrasena']:
+            user.contrasena = request.data['contrasena']
+        
+        user.save()
+        
+        return Response({
+            'id': user.id,
+            'nombre': user.nombre,
+            'correo': user.correo,
+            'rol': role
+        })
+    
+    def delete(self, request, pk):
+        """Eliminar un usuario"""
+        user, role = self.get_user_and_role(pk)
+        user.delete()
+        return Response({'message': 'Usuario eliminado correctamente'}, status=status.HTTP_200_OK)

@@ -5,6 +5,7 @@ class Alumno(models.Model):
     nombre = models.CharField(max_length=100)
     correo = models.EmailField(unique=True)
     contrasena = models.CharField(max_length=255)
+    # Sin campo fecha_creacion
 
     def save(self, *args, **kwargs):
         if self.contrasena and not self.contrasena.startswith("pbkdf2_"):
@@ -16,12 +17,13 @@ class Alumno(models.Model):
     
     @property
     def is_authenticated(self):
-     return True
+        return True
 
 class Profesor(models.Model):
     nombre = models.CharField(max_length=100)
     correo = models.EmailField(unique=True)
     contrasena = models.CharField(max_length=255)
+    # Sin campo fecha_creacion
 
     def save(self, *args, **kwargs):
         if self.contrasena and not self.contrasena.startswith("pbkdf2_"):
@@ -33,12 +35,13 @@ class Profesor(models.Model):
     
     @property
     def is_authenticated(self):
-     return True
+        return True
 
 class Admin(models.Model):
     nombre = models.CharField(max_length=100)
     correo = models.EmailField(unique=True)
     contrasena = models.CharField(max_length=255)
+    # Sin campo fecha_creacion
 
     def save(self, *args, **kwargs):
         if self.contrasena and not self.contrasena.startswith("pbkdf2_"):
@@ -50,7 +53,7 @@ class Admin(models.Model):
     
     @property
     def is_authenticated(self):
-     return True
+        return True
 
 class Categoria(models.Model):
     nombre = models.CharField(max_length=100)
@@ -69,8 +72,4 @@ class Categoria(models.Model):
     
     @property
     def post_count(self):
-        """Retorna el número de publicaciones en esta categoría"""
-        # Si tienes un modelo Post, descomenta esto:
-        # from .models import Post
-        # return self.posts.count()
-        return 0  # Temporalmente retorna 0
+        return 0
