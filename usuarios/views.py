@@ -7,20 +7,16 @@ from rest_framework.exceptions import PermissionDenied, NotFound
 from django.db.models import Count
 from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer
 from .models import Alumno, Profesor, Admin, Categoria,Post
-from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite  # Agregué IsAdminOrProfesorForWrite
+from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite  
 from rest_framework import generics
 from .permissions import IsAdmin
-
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status, generics, permissions
-from rest_framework_simplejwt.tokens import RefreshToken
-from .authentication import CustomJWTAuthentication
-from rest_framework.exceptions import PermissionDenied, NotFound
-from django.db.models import Count, Q
-from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer, PostSerializer
-from .models import Alumno, Profesor, Admin, Categoria, Post
+from .models import Alumno, Profesor, Admin, Categoria, Post, Comentario, Reporte
+from .serializers import (
+    RegisterSerializer, LoginSerializer, CategoriaSerializer,
+    PostSerializer, ComentarioSerializer, ReporteSerializer
+)
 from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite
+
 
 class RegisterView(APIView):
     def post(self, request):
@@ -326,9 +322,10 @@ class PostListCreateView(generics.ListCreateAPIView):
     authentication_classes = [CustomJWTAuthentication]
     
     def get_queryset(self):
-        queryset = Post.objects.all()
+        queryset = Post.objects.all().annotate(
+            comentarios_count=Count('comentarios')
+        )
         
-        # Filtrar por categoría si se especifica
         categoria_id = self.request.query_params.get('categoria')
         if categoria_id:
             queryset = queryset.filter(categoria_id=categoria_id)
@@ -338,7 +335,6 @@ class PostListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         
-        # Buscar el usuario en los diferentes modelos
         try:
             alumno = Alumno.objects.get(id=user.id)
             serializer.save(autor_alumno=alumno)
@@ -363,19 +359,165 @@ class MisPostsView(generics.ListAPIView):
         
         try:
             alumno = Alumno.objects.get(id=user.id)
-            return Post.objects.filter(autor_alumno=alumno).order_by('-fecha_creacion')
+            return Post.objects.filter(autor_alumno=alumno).annotate(
+                comentarios_count=Count('comentarios')
+            ).order_by('-fecha_creacion')
         except Alumno.DoesNotExist:
             try:
                 profesor = Profesor.objects.get(id=user.id)
-                return Post.objects.filter(autor_profesor=profesor).order_by('-fecha_creacion')
+                return Post.objects.filter(autor_profesor=profesor).annotate(
+                    comentarios_count=Count('comentarios')
+                ).order_by('-fecha_creacion')
             except Profesor.DoesNotExist:
                 try:
                     admin = Admin.objects.get(id=user.id)
-                    return Post.objects.filter(autor_admin=admin).order_by('-fecha_creacion')
+                    return Post.objects.filter(autor_admin=admin).annotate(
+                        comentarios_count=Count('comentarios')
+                    ).order_by('-fecha_creacion')
                 except Admin.DoesNotExist:
                     return Post.objects.none()
 
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Vista para ver, actualizar y eliminar una publicación específica"""
+    serializer_class = PostSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        return Post.objects.all().annotate(comentarios_count=Count('comentarios'))
+    
+    def get_object(self):
+        obj = super().get_object()
+        if self.request.method == 'GET':
+            obj.vistas += 1
+            obj.save()
+        return obj
+    
+    def perform_update(self, serializer):
+        user = self.request.user
+        post = self.get_object()
+        autor = post.autor
+        
+        if autor and autor.id == user.id:
+            serializer.save()
+        else:
+            raise PermissionDenied("Solo el autor puede editar esta publicación")
+    
+    def perform_destroy(self, instance):
+        user = self.request.user
+        autor = instance.autor
+        
+        if autor and autor.id == user.id:
+            instance.delete()
+        else:
+            try:
+                Admin.objects.get(id=user.id)
+                instance.delete()
+            except Admin.DoesNotExist:
+                raise PermissionDenied("No tienes permiso para eliminar esta publicación")
+
+# ==================== VISTAS DE COMENTARIOS ====================
+class ComentarioListCreateView(generics.ListCreateAPIView):
+    """Vista para listar y crear comentarios"""
+    serializer_class = ComentarioSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        queryset = Comentario.objects.all()
+        post_id = self.request.query_params.get('post')
+        if post_id:
+            queryset = queryset.filter(post_id=post_id)
+        return queryset.order_by('-fecha_creacion')
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        
+        try:
+            alumno = Alumno.objects.get(id=user.id)
+            serializer.save(autor_alumno=alumno)
+        except Alumno.DoesNotExist:
+            try:
+                profesor = Profesor.objects.get(id=user.id)
+                serializer.save(autor_profesor=profesor)
+            except Profesor.DoesNotExist:
+                try:
+                    admin = Admin.objects.get(id=user.id)
+                    serializer.save(autor_admin=admin)
+                except Admin.DoesNotExist:
+                    raise PermissionDenied("Usuario no válido")
+
+class ComentarioDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Vista para ver, actualizar y eliminar un comentario"""
+    serializer_class = ComentarioSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        return Comentario.objects.all()
+    
+    def perform_destroy(self, instance):
+        user = self.request.user
+        autor = instance.autor
+        
+        if autor and autor.id == user.id:
+            instance.delete()
+        else:
+            try:
+                Admin.objects.get(id=user.id)
+                instance.delete()
+            except Admin.DoesNotExist:
+                raise PermissionDenied("No tienes permiso para eliminar este comentario")
+
+# ==================== VISTAS DE REPORTES ====================
+class ReporteListCreateView(generics.ListCreateAPIView):
+    """Vista para listar y crear reportes"""
+    serializer_class = ReporteSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        user = self.request.user
+        try:
+            Admin.objects.get(id=user.id)
+            return Reporte.objects.all().order_by('-fecha_creacion')
+        except Admin.DoesNotExist:
+            return Reporte.objects.filter(
+                creado_por_alumno__id=user.id
+            ) | Reporte.objects.filter(
+                creado_por_profesor__id=user.id
+            ) | Reporte.objects.filter(
+                creado_por_admin__id=user.id
+            )
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        
+        try:
+            alumno = Alumno.objects.get(id=user.id)
+            serializer.save(creado_por_alumno=alumno)
+        except Alumno.DoesNotExist:
+            try:
+                profesor = Profesor.objects.get(id=user.id)
+                serializer.save(creado_por_profesor=profesor)
+            except Profesor.DoesNotExist:
+                try:
+                    admin = Admin.objects.get(id=user.id)
+                    serializer.save(creado_por_admin=admin)
+                except Admin.DoesNotExist:
+                    raise PermissionDenied("Usuario no válido")
+
+class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Vista para ver, actualizar y eliminar un reporte"""
+    serializer_class = ReporteSerializer
+    authentication_classes = [CustomJWTAuthentication]
+    
+    def get_queryset(self):
+        return Reporte.objects.all()
+    
+    def perform_update(self, serializer):
+        user = self.request.user
+        try:
+            Admin.objects.get(id=user.id)
+            serializer.save()
+        except Admin.DoesNotExist:
+            raise PermissionDenied("Solo administradores pueden actualizar reportes")
     """Vista para ver, actualizar y eliminar una publicación específica"""
     serializer_class = PostSerializer
     authentication_classes = [CustomJWTAuthentication]

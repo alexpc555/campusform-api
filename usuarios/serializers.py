@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Alumno, Profesor, Admin, Categoria,Post
+from .models import Alumno, Profesor, Admin, Categoria,Post, Comentario,Reporte
 
 class RegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
@@ -88,19 +88,53 @@ class PostSerializer(serializers.ModelSerializer):
     categoria_nombre = serializers.CharField(source='categoria.nombre', read_only=True)
     autor_nombre = serializers.CharField(read_only=True)
     autor_tipo = serializers.CharField(read_only=True)
+    comentarios_count = serializers.IntegerField(source='comentarios.count', read_only=True)
     
     class Meta:
         model = Post
         fields = [
             'id', 'titulo', 'contenido', 'categoria', 'categoria_nombre',
             'autor_nombre', 'autor_tipo', 'etiquetas', 'vistas',
-            'fecha_creacion', 'fecha_actualizacion'
+            'comentarios_count', 'fecha_creacion', 'fecha_actualizacion'
         ]
-        read_only_fields = ['id', 'fecha_creacion', 'fecha_actualizacion', 'vistas']
+        read_only_fields = ['id', 'fecha_creacion', 'fecha_actualizacion', 'vistas', 'comentarios_count']
     
     def validate(self, data):
         request = self.context.get('request')
         if request and request.user:
-            # Verificar que el usuario esté autenticado
+            return data
+        raise serializers.ValidationError("Usuario no autenticado")
+
+class ComentarioSerializer(serializers.ModelSerializer):
+    autor_nombre = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = Comentario
+        fields = ['id', 'contenido', 'post', 'autor_nombre', 'fecha_creacion']
+        read_only_fields = ['id', 'fecha_creacion']
+    
+    def validate(self, data):
+        request = self.context.get('request')
+        if request and request.user:
+            return data
+        raise serializers.ValidationError("Usuario no autenticado")
+
+class ReporteSerializer(serializers.ModelSerializer):
+    post_titulo = serializers.CharField(source='post.titulo', read_only=True)
+    motivo_display = serializers.CharField(source='get_motivo_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    autor_nombre = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = Reporte
+        fields = [
+            'id', 'post', 'post_titulo', 'motivo', 'motivo_display',
+            'razon', 'estado', 'estado_display', 'autor_nombre', 'fecha_creacion'
+        ]
+        read_only_fields = ['id', 'fecha_creacion', 'estado']
+    
+    def validate(self, data):
+        request = self.context.get('request')
+        if request and request.user:
             return data
         raise serializers.ValidationError("Usuario no autenticado")
