@@ -1,10 +1,10 @@
 from pathlib import Path
 from datetime import timedelta
 import os
+from dotenv import load_dotenv
 
-# Base del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(BASE_DIR / '.env')
 
 # Seguridad
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-only-key-change-this')
@@ -69,8 +69,6 @@ WSGI_APPLICATION = 'campusform.wsgi.application'
 
 
 # Base de datos
-# Local: usa XAMPP por defecto
-# Render: usa variables de entorno
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
