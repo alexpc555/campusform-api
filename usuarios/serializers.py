@@ -70,17 +70,22 @@ class LoginSerializer(serializers.Serializer):
         return data
 
 class CategoriaSerializer(serializers.ModelSerializer):
-    post_count = serializers.IntegerField(read_only=True)
-    creada_por_nombre = serializers.CharField(source='creada_por.nombre', read_only=True)
-    
+    creador_nombre = serializers.ReadOnlyField()
+    creador_tipo = serializers.ReadOnlyField()
+    post_count = serializers.ReadOnlyField()
+
     class Meta:
         model = Categoria
         fields = [
-            'id', 'nombre', 'descripcion', 
-            'post_count', 'creada_por', 'creada_por_nombre',
-            'fecha_creacion', 'fecha_actualizacion'
+            'id',
+            'nombre',
+            'descripcion',
+            'creador_nombre',
+            'creador_tipo',
+            'post_count',
+            'fecha_creacion',
+            'fecha_actualizacion',
         ]
-        read_only_fields = ['id', 'creada_por', 'fecha_creacion', 'fecha_actualizacion']
 
 
 #serializer nuevos 25/03/2026

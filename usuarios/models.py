@@ -58,7 +58,22 @@ class Admin(models.Model):
 class Categoria(models.Model):
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(blank=True)
-    creada_por = models.ForeignKey(Admin, on_delete=models.CASCADE, related_name='categorias')
+
+    creada_por_admin = models.ForeignKey(
+        Admin,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='categorias_creadas_admin'
+    )
+    creada_por_profesor = models.ForeignKey(
+        Profesor,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='categorias_creadas_profesor'
+    )
+
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -69,7 +84,28 @@ class Categoria(models.Model):
 
     def __str__(self):
         return self.nombre
-    
+
+    @property
+    def creador(self):
+        if self.creada_por_admin:
+            return self.creada_por_admin
+        elif self.creada_por_profesor:
+            return self.creada_por_profesor
+        return None
+
+    @property
+    def creador_nombre(self):
+        creador = self.creador
+        return creador.nombre if creador else 'Usuario desconocido'
+
+    @property
+    def creador_tipo(self):
+        if self.creada_por_admin:
+            return 'admin'
+        elif self.creada_por_profesor:
+            return 'teacher'
+        return None
+
     @property
     def post_count(self):
         return self.posts.count() if hasattr(self, 'posts') else 0

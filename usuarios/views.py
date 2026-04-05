@@ -1,22 +1,20 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics, permissions
+from rest_framework import status, generics
 from rest_framework_simplejwt.tokens import RefreshToken
-from .authentication import CustomJWTAuthentication
 from rest_framework.exceptions import PermissionDenied, NotFound
 from django.db.models import Count
-from .serializers import RegisterSerializer, LoginSerializer, CategoriaSerializer
-from .models import Alumno, Profesor, Admin, Categoria,Post
-from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite  
-from rest_framework import generics
-from .permissions import IsAdmin
+
+from .authentication import CustomJWTAuthentication
 from .models import Alumno, Profesor, Admin, Categoria, Post, Comentario, Reporte
 from .serializers import (
     RegisterSerializer, LoginSerializer, CategoriaSerializer,
     PostSerializer, ComentarioSerializer, ReporteSerializer
 )
-from .permissions import IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite
-
+from .permissions import (
+    IsAdmin, IsAdminOrReadOnly, IsAdminOrProfesorForWrite,
+    IsAdminProfesorOwnerOrReadOnly
+)
 
 class RegisterView(APIView):
     def post(self, request):
@@ -86,65 +84,55 @@ class LoginView(APIView):
 class CategoriaListCreateView(generics.ListCreateAPIView):
     serializer_class = CategoriaSerializer
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAdminOrProfesorForWrite]  # Lectura pública, escritura restringida
-    
+    permission_classes = [IsAdminProfesorOwnerOrReadOnly]
+
     def get_queryset(self):
         return Categoria.objects.all().order_by('-fecha_creacion')
-    
+
     def perform_create(self, serializer):
-        user = getattr(self.request, 'admin', None) or getattr(self.request, 'profesor', None)
-        if not user:
-            raise PermissionDenied("Solo administradores o profesores pueden crear categorías")
-        
-        serializer.save(creada_por=user)
+        user = self.request.user
+
+        if isinstance(user, Admin):
+            serializer.save(creada_por_admin=user)
+            return
+
+        if isinstance(user, Profesor):
+            serializer.save(creada_por_profesor=user)
+            return
+
+        raise PermissionDenied("Solo administradores o profesores pueden crear categorías")
+
 
 class CategoriaDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """
-    Vista para ver, actualizar y eliminar una categoría específica.
-    - GET: Cualquier usuario autenticado puede ver
-    - PUT/PATCH/DELETE: Solo admin puede modificar/eliminar
-    """
     serializer_class = CategoriaSerializer
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [IsAdminOrProfesorForWrite]
-    
-    def get_queryset(self):
-        """
-        Obtener categorías con conteo de posts.
-        """
-        try:
-            return Categoria.objects.annotate(
-                post_count=Count('posts')
-            )
-        except:
-            return Categoria.objects.all()
-    
-    def perform_update(self, serializer):
-        """
-        Verificar que solo admin pueda actualizar.
-        """
-        admin = getattr(self.request, 'admin', None)
-        if not admin:
-            try:
-                admin = Admin.objects.get(id=self.request.user.id)
-            except Admin.DoesNotExist:
-                raise PermissionDenied("Solo administradores pueden actualizar categorías")
-        
-        serializer.save()
-    
-    def perform_destroy(self, instance):
-        """
-        Verificar que solo admin pueda eliminar.
-        """
-        admin = getattr(self.request, 'admin', None)
-        if not admin:
-            try:
-                admin = Admin.objects.get(id=self.request.user.id)
-            except Admin.DoesNotExist:
-                raise PermissionDenied("Solo administradores pueden eliminar categorías")
-        
-        instance.delete()
+    permission_classes = [IsAdminProfesorOwnerOrReadOnly]
 
+    def get_queryset(self):
+        return Categoria.objects.all()
+
+    def perform_update(self, serializer):
+        categoria = self.get_object()
+        user = self.request.user
+
+        if isinstance(user, Admin):
+            serializer.save()
+            return
+
+        if isinstance(user, Profesor) and categoria.creada_por_profesor_id == user.id:
+            serializer.save()
+            return
+
+        raise PermissionDenied("No tienes permiso para actualizar esta categoría")
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+
+        if isinstance(user, Admin):
+            instance.delete()
+            return
+
+        raise PermissionDenied("Solo administradores pueden eliminar categorías")
 #codigo nuevo 25/03/2026
 
 class UsuarioListCreateView(APIView):
