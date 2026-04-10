@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    RegisterView, LoginView, CategoriaListCreateView, CategoriaDetailView,
+    MisComentariosView, RegisterView, LoginView, CategoriaListCreateView, CategoriaDetailView,
     UsuarioListCreateView, UsuarioDetailView, PostListCreateView,
     MisPostsView, PostDetailView, ComentarioListCreateView,
     ComentarioDetailView, ReporteListCreateView, ReporteDetailView
@@ -29,7 +29,7 @@ urlpatterns = [
     # Comentarios
     path('comentarios/', ComentarioListCreateView.as_view(), name='comentario-list'),
     path('comentarios/<int:pk>/', ComentarioDetailView.as_view(), name='comentario-detail'),
-
+    path('comentarios/mis-comentarios/', MisComentariosView.as_view(), name='mis-comentarios'),
     # Reportes
     path('reportes/', ReporteListCreateView.as_view(), name='reporte-list'),
     path('reportes/<int:pk>/', ReporteDetailView.as_view(), name='reporte-detail'),

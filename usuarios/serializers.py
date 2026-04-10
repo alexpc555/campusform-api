@@ -112,17 +112,41 @@ class PostSerializer(serializers.ModelSerializer):
 
 class ComentarioSerializer(serializers.ModelSerializer):
     autor_nombre = serializers.CharField(read_only=True)
-    
+    autor_id = serializers.SerializerMethodField()
+    autor_tipo = serializers.SerializerMethodField()
+
     class Meta:
         model = Comentario
-        fields = ['id', 'contenido', 'post', 'autor_nombre', 'fecha_creacion']
+        fields = [
+            'id',
+            'contenido',
+            'post',
+            'autor_nombre',
+            'autor_id',
+            'autor_tipo',
+            'fecha_creacion'
+        ]
         read_only_fields = ['id', 'fecha_creacion']
-    
+
+    def get_autor_id(self, obj):
+        autor = obj.autor
+        return autor.id if autor else None
+
+    def get_autor_tipo(self, obj):
+        if obj.autor_alumno:
+            return 'student'
+        if obj.autor_profesor:
+            return 'teacher'
+        if obj.autor_admin:
+            return 'admin'
+        return None
+
     def validate(self, data):
         request = self.context.get('request')
         if request and request.user:
             return data
         raise serializers.ValidationError("Usuario no autenticado")
+
 
 class ReporteSerializer(serializers.ModelSerializer):
     post_titulo = serializers.CharField(source='post.titulo', read_only=True)

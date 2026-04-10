@@ -101,8 +101,27 @@ class CategoriaListCreateView(generics.ListCreateAPIView):
             return
 
         raise PermissionDenied("Solo administradores o profesores pueden crear categorías")
+#codigo nuevo 25/03/2026 -----------------------------------------------------------------------
 
+class MisComentariosView(generics.ListAPIView):
+    """Vista para obtener los comentarios del usuario autenticado"""
+    serializer_class = ComentarioSerializer
+    authentication_classes = [CustomJWTAuthentication]
 
+    def get_queryset(self):
+        user = self.request.user
+
+        if isinstance(user, Alumno):
+            return Comentario.objects.filter(autor_alumno=user).order_by('-fecha_creacion')
+
+        if isinstance(user, Profesor):
+            return Comentario.objects.filter(autor_profesor=user).order_by('-fecha_creacion')
+
+        if isinstance(user, Admin):
+            return Comentario.objects.filter(autor_admin=user).order_by('-fecha_creacion')
+
+        return Comentario.objects.none()
+    
 class CategoriaDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CategoriaSerializer
     authentication_classes = [CustomJWTAuthentication]
@@ -495,10 +514,10 @@ class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Vista para ver, actualizar y eliminar un reporte"""
     serializer_class = ReporteSerializer
     authentication_classes = [CustomJWTAuthentication]
-    
+
     def get_queryset(self):
         return Reporte.objects.all()
-    
+
     def perform_update(self, serializer):
         user = self.request.user
         try:
@@ -506,45 +525,13 @@ class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
             serializer.save()
         except Admin.DoesNotExist:
             raise PermissionDenied("Solo administradores pueden actualizar reportes")
-    """Vista para ver, actualizar y eliminar una publicación específica"""
-    serializer_class = PostSerializer
-    authentication_classes = [CustomJWTAuthentication]
-    
-    def get_queryset(self):
-        return Post.objects.all()
-    
-    def get_object(self):
-        obj = super().get_object()
-        
-        # Incrementar vistas solo para GET requests
-        if self.request.method == 'GET':
-            obj.vistas += 1
-            obj.save()
-        
-        return obj
-    
-    def perform_update(self, serializer):
-        user = self.request.user
-        post = self.get_object()
-        
-        # Verificar que el usuario sea el autor
-        autor = post.autor
-        if autor and autor.id == user.id:
-            serializer.save()
-        else:
-            raise PermissionDenied("Solo el autor puede editar esta publicación")
-    
+
     def perform_destroy(self, instance):
         user = self.request.user
-        autor = instance.autor
-        
-        # Verificar que el usuario sea el autor o admin
-        if autor and autor.id == user.id:
+        try:
+            Admin.objects.get(id=user.id)
             instance.delete()
-        else:
-            # Verificar si es admin
-            try:
-                Admin.objects.get(id=user.id)
-                instance.delete()
-            except Admin.DoesNotExist:
-                raise PermissionDenied("No tienes permiso para eliminar esta publicación")
+        except Admin.DoesNotExist:
+            raise PermissionDenied("Solo administradores pueden eliminar reportes")
+        
+        
