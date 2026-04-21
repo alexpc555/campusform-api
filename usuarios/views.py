@@ -414,25 +414,35 @@ class MisPostsView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         
+        print(f" MisPostsView - Usuario: {user}")
+        print(f" MisPostsView - Tipo: {type(user)}")
+        print(f" MisPostsView - ID: {user.id}")
+        print(f" MisPostsView - Nombre: {user.nombre}")
+        
         try:
             alumno = Alumno.objects.get(id=user.id)
-            return Post.objects.filter(autor_alumno=alumno).annotate(
-                comentarios_count=Count('comentarios')
-            ).order_by('-fecha_creacion')
+            print(f" Usuario es Alumno")
+            queryset = Post.objects.filter(autor_alumno=alumno)
         except Alumno.DoesNotExist:
             try:
                 profesor = Profesor.objects.get(id=user.id)
-                return Post.objects.filter(autor_profesor=profesor).annotate(
-                    comentarios_count=Count('comentarios')
-                ).order_by('-fecha_creacion')
+                print(f" Usuario es Profesor (ID: {profesor.id})")
+                queryset = Post.objects.filter(autor_profesor=profesor)
+                print(f" Posts encontrados para profesor {profesor.nombre}: {queryset.count()}")
+                for post in queryset:
+                    print(f"   - Post: {post.titulo} (Autor: {post.autor_nombre})")
             except Profesor.DoesNotExist:
                 try:
                     admin = Admin.objects.get(id=user.id)
-                    return Post.objects.filter(autor_admin=admin).annotate(
-                        comentarios_count=Count('comentarios')
-                    ).order_by('-fecha_creacion')
+                    print(f" Usuario es Admin")
+                    queryset = Post.objects.filter(autor_admin=admin)
                 except Admin.DoesNotExist:
+                    print(f" Usuario no encontrado en ninguna tabla")
                     return Post.objects.none()
+        
+        return queryset.annotate(
+            comentarios_count=Count('comentarios')
+        ).order_by('-fecha_creacion')
 
 
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
