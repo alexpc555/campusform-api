@@ -1,9 +1,10 @@
+from django.db.models import Count, F
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, generics
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import PermissionDenied, NotFound
-from django.db.models import Count
+from rest_framework.permissions import IsAuthenticated
 
 from .authentication import CustomJWTAuthentication
 from .models import Alumno, Profesor, Admin, Categoria, Post, Comentario, Reporte
@@ -510,6 +511,51 @@ class ReporteListCreateView(generics.ListCreateAPIView):
                 except Admin.DoesNotExist:
                     raise PermissionDenied("Usuario no válido")
 
+
+class AnalyticsDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CustomJWTAuthentication]
+
+    def get(self, request):
+        total_alumnos = Alumno.objects.count()
+        total_profesores = Profesor.objects.count()
+        total_admins = Admin.objects.count()
+        total_users = total_alumnos + total_profesores + total_admins
+
+        total_posts = Post.objects.count()
+        total_comments = Comentario.objects.count()
+        total_reports = Reporte.objects.count()
+
+        avg_comments_per_post = 0
+        if total_posts > 0:
+            avg_comments_per_post = round(total_comments / total_posts, 2)
+
+        posts_per_category = (
+            Categoria.objects.annotate(posts_count=Count("posts"))
+            .values("id", "nombre", "posts_count")
+            .order_by("-posts_count")
+        )
+
+        return Response({
+            "summary": {
+                "total_users": total_users,
+                "total_alumnos": total_alumnos,
+                "total_profesores": total_profesores,
+                "total_admins": total_admins,
+                "total_posts": total_posts,
+                "total_comments": total_comments,
+                "total_reports": total_reports,
+                "avg_comments_per_post": avg_comments_per_post
+            },
+            "posts_per_category": [
+                {
+                    "id": item["id"],
+                    "name": item["nombre"],   # 👈 AQUÍ el cambio
+                    "posts": item["posts_count"]
+                }
+                for item in posts_per_category
+            ]
+        })
 class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Vista para ver, actualizar y eliminar un reporte"""
     serializer_class = ReporteSerializer
@@ -534,4 +580,4 @@ class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
         except Admin.DoesNotExist:
             raise PermissionDenied("Solo administradores pueden eliminar reportes")
         
-        
+        #codigo nuevo 25/03/2026 -----------------------------------------------------------------------

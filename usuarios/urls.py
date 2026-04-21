@@ -1,4 +1,5 @@
 from django.urls import path
+from .views import AnalyticsDashboardView
 from .views import (
     MisComentariosView, RegisterView, LoginView, CategoriaListCreateView, CategoriaDetailView,
     UsuarioListCreateView, UsuarioDetailView, PostListCreateView,
@@ -33,4 +34,7 @@ urlpatterns = [
     # Reportes
     path('reportes/', ReporteListCreateView.as_view(), name='reporte-list'),
     path('reportes/<int:pk>/', ReporteDetailView.as_view(), name='reporte-detail'),
+
+    # Analytics
+    path('analytics/dashboard/', AnalyticsDashboardView.as_view(), name='analytics-dashboard'),
 ]
