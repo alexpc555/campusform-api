@@ -18,7 +18,12 @@ from .permissions import (
 )
 
 class RegisterView(APIView):
+    permission_classes = []  # Permitir acceso público
+    authentication_classes = []  # Sin autenticación requerida
+    
     def post(self, request):
+        print("📥 Datos recibidos en registro:", request.data)  # Debug
+        
         serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -31,18 +36,28 @@ class RegisterView(APIView):
             else:
                 role = "admin"
             
+            print(f"✅ Usuario creado: {user.nombre} - {role}")  # Debug
+            
             return Response(
                 {
-                    "message": "Usuario creado", 
+                    "message": "Usuario creado exitosamente", 
                     "id": user.id,
                     "role": role
                 },
                 status=status.HTTP_201_CREATED
             )
+        
+        print("❌ Errores de validación:", serializer.errors)  # Debug
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 class LoginView(APIView):
+    permission_classes = []  # Permitir acceso público
+    authentication_classes = []  # Sin autenticación requerida
+    
     def post(self, request):
+        print("📥 Datos recibidos en login:", request.data)  # Debug
+        
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.validated_data['user']
@@ -61,11 +76,13 @@ class LoginView(APIView):
             
             # Determinar la redirección según el rol
             if user_model == "student":
-                redirect_url = "/dashboard"
+                redirect_url = "/student-panel"
             elif user_model == "teacher":
                 redirect_url = "/profesor"
             else:  # admin
                 redirect_url = "/admin"
+            
+            print(f"✅ Login exitoso: {user.nombre} - {user_model}")  # Debug
             
             return Response({
                 "message": "Login exitoso",
@@ -80,7 +97,9 @@ class LoginView(APIView):
                 "redirect": redirect_url
             }, status=status.HTTP_200_OK)
         
+        print("❌ Errores de validación en login:", serializer.errors)  # Debug
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class CategoriaListCreateView(generics.ListCreateAPIView):
     serializer_class = CategoriaSerializer
@@ -102,7 +121,7 @@ class CategoriaListCreateView(generics.ListCreateAPIView):
             return
 
         raise PermissionDenied("Solo administradores o profesores pueden crear categorías")
-#codigo nuevo 25/03/2026 -----------------------------------------------------------------------
+
 
 class MisComentariosView(generics.ListAPIView):
     """Vista para obtener los comentarios del usuario autenticado"""
@@ -116,13 +135,14 @@ class MisComentariosView(generics.ListAPIView):
             return Comentario.objects.filter(autor_alumno=user).order_by('-fecha_creacion')
 
         if isinstance(user, Profesor):
-            return Comentario.objects.filter(autor_profesor=user).order_by('-fecha_creacion')
+            return Comentario.objects.filter(autor_profesor=profesor).order_by('-fecha_creacion')
 
         if isinstance(user, Admin):
             return Comentario.objects.filter(autor_admin=user).order_by('-fecha_creacion')
 
         return Comentario.objects.none()
     
+
 class CategoriaDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CategoriaSerializer
     authentication_classes = [CustomJWTAuthentication]
@@ -153,7 +173,7 @@ class CategoriaDetailView(generics.RetrieveUpdateDestroyAPIView):
             return
 
         raise PermissionDenied("Solo administradores pueden eliminar categorías")
-#codigo nuevo 25/03/2026
+
 
 class UsuarioListCreateView(APIView):
     """Vista para listar y crear usuarios (solo admin)"""
@@ -198,20 +218,26 @@ class UsuarioListCreateView(APIView):
     
     def post(self, request):
         """Crear un nuevo usuario"""
-        nombre = request.data.get('nombre')
-        correo = request.data.get('correo')
-        contrasena = request.data.get('contrasena')
-        rol = request.data.get('rol')
+        nombre = request.data.get('nombre', '').strip()
+        correo = request.data.get('correo', '').strip().lower()
+        contrasena = request.data.get('contrasena', '')
+        rol = request.data.get('rol', '')
         
         # Validaciones
         if not nombre or not correo or not contrasena or not rol:
-            return Response({'message': 'Todos los campos son requeridos'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': 'Todos los campos son requeridos'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Validar que no exista el correo
         if (Alumno.objects.filter(correo=correo).exists() or 
             Profesor.objects.filter(correo=correo).exists() or
             Admin.objects.filter(correo=correo).exists()):
-            return Response({'message': 'El correo ya está registrado'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': 'El correo ya está registrado'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Crear según rol
         try:
@@ -234,7 +260,10 @@ class UsuarioListCreateView(APIView):
                     contrasena=contrasena
                 )
             else:
-                return Response({'message': 'Rol no válido'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'message': 'Rol no válido'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             return Response({
                 'id': user.id,
@@ -244,7 +273,11 @@ class UsuarioListCreateView(APIView):
             }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
-            return Response({'message': f'Error al crear usuario: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'message': f'Error al crear usuario: {str(e)}'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
 
 class UsuarioDetailView(APIView):
     """Vista para obtener, actualizar y eliminar un usuario específico (solo admin)"""
@@ -282,30 +315,43 @@ class UsuarioDetailView(APIView):
         """Actualizar un usuario"""
         user, role = self.get_user_and_role(pk)
         
-        # Actualizar campos
+        # Actualizar nombre
         if 'nombre' in request.data:
-            user.nombre = request.data['nombre']
+            user.nombre = request.data['nombre'].strip()
         
+        # Actualizar correo
         if 'correo' in request.data:
-            new_email = request.data['correo']
-            if new_email != user.correo:
-                # Verificar que el nuevo correo no exista en otros usuarios
-                email_exists = False
-                
-                if role != 'student' and Alumno.objects.filter(correo=new_email).exists():
-                    email_exists = True
-                elif role != 'teacher' and Profesor.objects.filter(correo=new_email).exists():
-                    email_exists = True
-                elif role != 'admin' and Admin.objects.filter(correo=new_email).exists():
-                    email_exists = True
+            new_email = request.data['correo'].strip().lower()
+            
+            # Si el correo NO cambió, no hacer nada
+            if new_email == user.correo:
+                pass  # No validar, es el mismo correo
+            else:
+                # Verificar si el nuevo correo ya existe en CUALQUIER tabla
+                email_exists = (
+                    Alumno.objects.filter(correo=new_email).exists() or
+                    Profesor.objects.filter(correo=new_email).exists() or
+                    Admin.objects.filter(correo=new_email).exists()
+                )
                 
                 if email_exists:
-                    return Response({'message': 'El correo ya está en uso'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response(
+                        {'message': 'El correo ya está registrado por otro usuario'}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 
                 user.correo = new_email
         
-        if 'contrasena' in request.data and request.data['contrasena']:
-            user.contrasena = request.data['contrasena']
+        # Actualizar contraseña (opcional)
+        if 'contrasena' in request.data and request.data['contrasena'].strip():
+            user.contrasena = request.data['contrasena'].strip()
+        
+        # No permitir cambiar el rol
+        if 'rol' in request.data and request.data['rol'] != role:
+            return Response(
+                {'message': 'No se puede cambiar el rol de un usuario existente'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         user.save()
         
@@ -320,10 +366,12 @@ class UsuarioDetailView(APIView):
         """Eliminar un usuario"""
         user, role = self.get_user_and_role(pk)
         user.delete()
-        return Response({'message': 'Usuario eliminado correctamente'}, status=status.HTTP_200_OK)
+        return Response(
+            {'message': 'Usuario eliminado correctamente'}, 
+            status=status.HTTP_200_OK
+        )
 
-        #codigo nuevo 25/03/2026 -----------------------------------------------------------------------
-    
+
 class PostListCreateView(generics.ListCreateAPIView):
     """Vista para listar y crear publicaciones"""
     serializer_class = PostSerializer
@@ -357,6 +405,7 @@ class PostListCreateView(generics.ListCreateAPIView):
                 except Admin.DoesNotExist:
                     raise PermissionDenied("Usuario no válido")
 
+
 class MisPostsView(generics.ListAPIView):
     """Vista para obtener los posts del usuario autenticado"""
     serializer_class = PostSerializer
@@ -384,6 +433,7 @@ class MisPostsView(generics.ListAPIView):
                     ).order_by('-fecha_creacion')
                 except Admin.DoesNotExist:
                     return Post.objects.none()
+
 
 class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Vista para ver, actualizar y eliminar una publicación específica"""
@@ -423,6 +473,7 @@ class PostDetailView(generics.RetrieveUpdateDestroyAPIView):
             except Admin.DoesNotExist:
                 raise PermissionDenied("No tienes permiso para eliminar esta publicación")
 
+
 # ==================== VISTAS DE COMENTARIOS ====================
 class ComentarioListCreateView(generics.ListCreateAPIView):
     """Vista para listar y crear comentarios"""
@@ -453,6 +504,7 @@ class ComentarioListCreateView(generics.ListCreateAPIView):
                 except Admin.DoesNotExist:
                     raise PermissionDenied("Usuario no válido")
 
+
 class ComentarioDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Vista para ver, actualizar y eliminar un comentario"""
     serializer_class = ComentarioSerializer
@@ -473,6 +525,7 @@ class ComentarioDetailView(generics.RetrieveUpdateDestroyAPIView):
                 instance.delete()
             except Admin.DoesNotExist:
                 raise PermissionDenied("No tienes permiso para eliminar este comentario")
+
 
 # ==================== VISTAS DE REPORTES ====================
 class ReporteListCreateView(generics.ListCreateAPIView):
@@ -550,12 +603,14 @@ class AnalyticsDashboardView(APIView):
             "posts_per_category": [
                 {
                     "id": item["id"],
-                    "name": item["nombre"],   # 👈 AQUÍ el cambio
+                    "name": item["nombre"],
                     "posts": item["posts_count"]
                 }
                 for item in posts_per_category
             ]
         })
+
+
 class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Vista para ver, actualizar y eliminar un reporte"""
     serializer_class = ReporteSerializer
@@ -579,5 +634,3 @@ class ReporteDetailView(generics.RetrieveUpdateDestroyAPIView):
             instance.delete()
         except Admin.DoesNotExist:
             raise PermissionDenied("Solo administradores pueden eliminar reportes")
-        
-        #codigo nuevo 25/03/2026 -----------------------------------------------------------------------
