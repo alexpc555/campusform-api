@@ -17,3 +17,6 @@ sqlparse==0.5.5
 tzdata==2025.3
 urllib3==2.6.3
 yarg==0.1.10
+whitenoise
+psycopg2-binary
+dj-database-url

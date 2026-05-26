@@ -3,6 +3,11 @@ from datetime import timedelta
 import os
 from dotenv import load_dotenv
 
+import os
+import pymysql
+import dj_database_url
+pymysql.install_as_MySQLdb()
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
@@ -43,6 +48,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+     # 'corsheaders.middleware.CorsPostCsrfMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 
@@ -67,7 +77,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'campusform.wsgi.application'
 
+DATABASES = {
+    'default': dj_database_url.config(
+        default='sqlite:///db.sqlite3',
+        conn_max_age=600
+    )
+}
 
+'''
 # Base de datos
 DATABASES = {
     'default': {
@@ -79,6 +96,7 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT', '3306'),
     }
 }
+'''
 
 
 # Validadores de contraseña
@@ -151,3 +169,6 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
+
